@@ -1,9 +1,7 @@
 import unittest
+from unittest.mock import mock_open, patch
 from datetime import date
 from model import MeasurementParser, MeasurementRepository
-import tempfile
-import os
-
 
 class TestParser(unittest.TestCase):
 
@@ -41,12 +39,6 @@ class TestRepository(unittest.TestCase):
     def setUp(self):
         self.repo = MeasurementRepository(MeasurementParser())
 
-    def _create_temp_file(self, content: str):
-        tmp = tempfile.NamedTemporaryFile(delete=False, mode='w', encoding='utf-8')
-        tmp.write(content)
-        tmp.close()
-        return tmp.name
-
     def test_load_skips_invalid_lines(self):
         content = (
             '2024.03.10 23.5 "Красный" "Авто" "Иркутск"\n'
@@ -54,36 +46,28 @@ class TestRepository(unittest.TestCase):
             '2024.03.11 20.0 "Синий" "Ручной" "Ачинск"\n'
         )
 
-        filename = self._create_temp_file(content)
-        try:
-            result = self.repo.load_from_file(filename)
-            self.assertEqual(len(result), 2)
-        finally:
-            os.remove(filename)
+        with patch("builtins.open", mock_open(read_data=content)):
+            result = self.repo.load_from_file("fake.txt")
 
-    # Тест на пропуск пустых строк
+        self.assertEqual(len(result), 2)
+
     def test_skip_empty_lines(self):
         content = (
             '\n'
-            '2024.03.10 23.5 "Красный" "Авто" "Иркутск"'
+            '2024.03.10 23.5 "Красный" "Авто" "Иркутск"\n'
             '\n'
         )
-        filename = self._create_temp_file(content)
-        try:
-            result = self.repo.load_from_file(filename)
-            self.assertEqual(len(result), 1)
-        finally:
-            os.remove(filename)
 
-    # Тест на загрузку пустого файла
+        with patch("builtins.open", mock_open(read_data=content)):
+            result = self.repo.load_from_file("fake.txt")
+
+        self.assertEqual(len(result), 1)
+
     def test_load_empty_file(self):
-        filename = self._create_temp_file("")
-        try:
-            result = self.repo.load_from_file(filename)
-            self.assertEqual(result, [])
-        finally:
-            os.remove(filename)
+        with patch("builtins.open", mock_open(read_data="")):
+            result = self.repo.load_from_file("fake.txt")
 
+        self.assertEqual(result, [])
 
 if __name__ == '__main__':
     unittest.main()
