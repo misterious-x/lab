@@ -1,59 +1,16 @@
-from dataclasses import dataclass
-from datetime import date
 from tkinter import Tk, ttk, Button, Entry, Label, END, StringVar
 import tkinter.messagebox as msgbox
-
-
-@dataclass
-class TemperatureMeasurement:
-    date: date
-    color: str
-    type_measure: str
-    location: str
-    value: float
-
-def extract_strings(line: str) -> tuple[list[str], str]:
-    strings = []
-
-    while '"' in line:
-        start = line.find('"')
-        end = line.find('"', start + 1)
-
-        strings.append(line[start + 1:end])
-        line = line[:start] + line[end + 1:]
-
-    return strings, line
-
-def parse_date(date_str: str) -> date:
-    year, month, day = map(int, date_str.split('.'))
-    return date(year, month, day)
-
-def parse_value(value_str: str) -> float:
-    return float(value_str)
-
-def parse_line(line: str) -> TemperatureMeasurement:
-    strings, remaining_line = extract_strings(line)
-
-    color, type_measure, location = strings
-
-    parts = remaining_line.split()
-    date_ = parse_date(parts[0])
-    value = parse_value(parts[1])
-
-    return TemperatureMeasurement(date_, color, type_measure, location, value)
-
-
-def read_measurements_from_file(filename: str) -> list:
-    with open(filename, 'r', encoding='utf-8') as f:
-        return [parse_line(line.strip()) for line in f if line.strip()]
+from datetime import date
+from model import TemperatureMeasurement
 
 
 class TemperatureApp:
-    def __init__(self, root, measurements):
+    def __init__(self, root, repository):
         self.root = root
         self.root.title("Temperature Measurements")
 
-        self.measurements = measurements
+        self.repository = repository
+        self.measurements = []
 
         self.tree = ttk.Treeview(root, columns=("date", "color", "type", "location", "value"), show='headings')
         for col in self.tree["columns"]:
@@ -62,7 +19,6 @@ class TemperatureApp:
         self.tree.pack(fill='both', expand=True)
 
         self._add_controls()
-        self._populate_tree()
 
     def _add_controls(self):
         Label(self.root, text="Дата (гггг.мм.дд):").pack()
@@ -96,13 +52,13 @@ class TemperatureApp:
 
     def _populate_tree(self):
         for m in self.measurements:
-            self.tree.insert('', END, values=self._measurement_to_tuple(m))
-    
-    def _delete_tree(self):
+            self.tree.insert('', END, values=self._to_tuple(m))
+
+    def _clear_tree(self):
         for item in self.tree.get_children():
             self.tree.delete(item)
 
-    def _measurement_to_tuple(self, m: TemperatureMeasurement):
+    def _to_tuple(self, m):
         return (m.date.strftime("%Y.%m.%d"), m.color, m.type_measure, m.location, f"{m.value:.2f}")
 
     def add_measurement(self):
@@ -115,35 +71,25 @@ class TemperatureApp:
             value = float(self.value_var.get())
 
             m = TemperatureMeasurement(date_, color, type_, location, value)
+            
             self.measurements.append(m)
-            self.tree.insert('', END, values=self._measurement_to_tuple(m))
+            self.tree.insert('', END, values=self._to_tuple(m))
+
         except Exception as e:
             msgbox.showerror("Ошибка", f"Неверный ввод: {e}")
 
     def delete_selected(self):
-        selected_item = self.tree.selection()
-        if not selected_item:
-            return
-
-        for item in selected_item:
+        for item in self.tree.selection():
             index = self.tree.index(item)
             self.tree.delete(item)
             del self.measurements[index]
 
     def open_file(self):
         try:
-            FILE_NAME = self.file_var.get()
-            self.measurements = read_measurements_from_file(FILE_NAME)
-            self._delete_tree()
+            filename = self.file_var.get()
+            self.measurements = self.repository.load_from_file(filename)
+
+            self._clear_tree()
             self._populate_tree()
-        except:
+        except Exception:
             msgbox.showerror("Ошибка", "Неверный путь файла!")
-
-
-if __name__ == "__main__":
-    FILE_NAME = "measurements.txt"
-    measurements = read_measurements_from_file(FILE_NAME)
-
-    root = Tk()
-    app = TemperatureApp(root, measurements)
-    root.mainloop()
