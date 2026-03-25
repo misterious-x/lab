@@ -79,3 +79,82 @@ class MeasurementRepository:
                     logging.warning(f"Ошибка в строке {i}: {line} ({e})")
 
         return result
+
+class CommandProcessor:
+    def __init__(self, measurements: list):
+        self.measurements = measurements
+
+    def execute_file(self, filename: str):
+        with open(filename, 'r', encoding='utf-8') as f:
+            for i, line in enumerate(f, start=1):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    self.execute(line)
+                except Exception as e:
+                    logging.warning(f"Ошибка в команде {i}: {line} ({e})")
+
+    def execute(self, command_line: str):
+        if command_line.startswith("ADD"):
+            self._add(command_line[3:].strip())
+        elif command_line.startswith("REM"):
+            self._remove(command_line[3:].strip())
+        elif command_line.startswith("SAVE"):
+            self._save(command_line[4:].strip())
+        else:
+            raise ValueError(f"Неизвестная команда: {command_line}")
+
+    def _add(self, data: str):
+        parts = [p.strip() for p in data.split(';')]
+        if len(parts) != 5:
+            raise ValueError("Неверный формат ADD")
+
+        year, month, day = map(int, parts[0].split('.'))
+
+        m = TemperatureMeasurement(
+            date(year, month, day),
+            parts[1],
+            parts[2],
+            parts[3],
+            float(parts[4])
+        )
+
+        self.measurements.append(m)
+
+    def _remove(self, condition: str):
+        parts = condition.split()
+        if len(parts) != 3:
+            raise ValueError("Неверный формат REM")
+
+        field, op, value = parts
+
+        def check(m):
+            attr = getattr(m, field)
+            
+            if isinstance(attr, date):
+                attr_val = attr.strftime("%Y.%m.%d")
+                cmp_val = value
+            elif isinstance(attr, (int, float)):
+                attr_val = float(attr)
+                cmp_val = float(value)
+            else:
+                attr_val = str(attr)
+                cmp_val = value
+
+            if op == "<":
+                return attr_val < cmp_val
+            elif op == ">":
+                return attr_val > cmp_val
+            elif op == "==":
+                return attr_val == cmp_val
+            else:
+                raise ValueError("Неизвестная операция")
+
+        self.measurements[:] = [m for m in self.measurements if not check(m)]
+
+    def _save(self, filename: str):
+        with open(filename, 'w', encoding='utf-8') as f:
+            for m in self.measurements:
+                line = f'{m.date.strftime("%Y.%m.%d")} {m.value} "{m.color}" "{m.type_measure}" "{m.location}"\n'
+                f.write(line)

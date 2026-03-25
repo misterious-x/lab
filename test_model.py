@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import mock_open, patch
 from datetime import date
-from model import MeasurementParser, MeasurementRepository
+from model import MeasurementParser, MeasurementRepository, CommandProcessor, TemperatureMeasurement
 
 class TestParser(unittest.TestCase):
 
@@ -68,6 +68,39 @@ class TestRepository(unittest.TestCase):
             result = self.repo.load_from_file("fake.txt")
 
         self.assertEqual(result, [])
+
+class TestCommands(unittest.TestCase):
+
+    def test_add_command(self):
+        data = []
+        processor = CommandProcessor(data)
+
+        processor.execute("ADD 2024.03.10;Красный;Авто;Иркутск;23.5")
+
+        self.assertEqual(len(data), 1)
+
+    def test_remove_command(self):
+        data = [
+            TemperatureMeasurement(date(2024, 3, 10), "Красный", "Авто", "Иркутск", 500),
+            TemperatureMeasurement(date(2024, 3, 11), "Синий", "Ручной", "Ачинск", 1500),
+        ]
+
+        processor = CommandProcessor(data)
+        processor.execute("REM value < 1000")
+
+        self.assertEqual(len(data), 1)
+        self.assertEqual(data[0].value, 1500)
+
+    @patch("builtins.open", new_callable=mock_open)
+    def test_save_command(self, mock_file):
+        data = [
+            TemperatureMeasurement(date(2024, 3, 10), "Красный", "Авто", "Иркутск", 23.5)
+        ]
+
+        processor = CommandProcessor(data)
+        processor.execute("SAVE test.txt")
+
+        mock_file.assert_called_with("test.txt", 'w', encoding='utf-8')
 
 if __name__ == '__main__':
     unittest.main()

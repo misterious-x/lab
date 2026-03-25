@@ -1,8 +1,7 @@
 from tkinter import Tk, ttk, Button, Entry, Label, END, StringVar
 import tkinter.messagebox as msgbox
 from datetime import date
-from model import TemperatureMeasurement
-
+from model import TemperatureMeasurement, CommandProcessor
 
 class TemperatureApp:
     def __init__(self, root, repository):
@@ -44,11 +43,17 @@ class TemperatureApp:
         Button(self.root, text="Добавить", command=self.add_measurement).pack(pady=5)
         Button(self.root, text="Удалить", command=self.delete_selected).pack(pady=5)
 
-        Label(self.root, text="Путь файла:").pack()
+        Label(self.root, text="Файл данных:").pack()
         self.file_var = StringVar()
         Entry(self.root, textvariable=self.file_var).pack()
 
         Button(self.root, text="Открыть файл", command=self.open_file).pack(pady=5)
+
+        Label(self.root, text="Файл команд:").pack()
+        self.cmd_file_var = StringVar()
+        Entry(self.root, textvariable=self.cmd_file_var).pack()
+
+        Button(self.root, text="Выполнить команды", command=self.run_commands).pack(pady=5)
 
     def _populate_tree(self):
         for m in self.measurements:
@@ -93,3 +98,14 @@ class TemperatureApp:
             self._populate_tree()
         except Exception:
             msgbox.showerror("Ошибка", "Неверный путь файла!")
+
+    def run_commands(self):
+        try:
+            processor = CommandProcessor(self.measurements)
+            processor.execute_file(self.cmd_file_var.get())
+
+            self._clear_tree()
+            self._populate_tree()
+
+        except Exception as e:
+            msgbox.showerror("Ошибка", str(e))
